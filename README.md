@@ -10,6 +10,24 @@ Youtube: https://www.youtube.com/watch?v=X48VuDVv0do
 This lab will deploy a pod using MongoDb image and Mongo-Express application accessing our DB Mongo. We will also use external and internal service also configmag storing variables and secret to manage credentials.
 
 
+# Components 
+
+- 2 Deployment / Pod
+- 2 Services
+- 1 ConfigMap
+- 1 Secret
+
+
+## Detailing
+
+- MongoDB Pod 
+- Internal Service for MongoDB
+- ConfigMap with DB URL
+- Secret with DB User and DB PWD
+- Mongo-Express Pod
+- External Service exposing Mongo-Express
+
+
 
 
 
