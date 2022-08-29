@@ -396,3 +396,229 @@ Now we open our browser on that port http://192.168.49.2:30000/ and we will get 
 
 
 
+# Namespaces
+
+- Organise resources in namespaces
+- Virtual cluster inside of a cluster
+- 4 Namespaces per Default
+
+
+```
+degutos@pop-os:~/git/wikis.wiki$ kubectl get ns
+NAME              STATUS   AGE
+default           Active   22h
+kube-node-lease   Active   22h
+kube-public       Active   22h
+kube-system       Active   22h
+```
+
+
+- Most of resources can not be accessed from another namespace. Each NS must have its own ConfigMap and Secret.
+- If you have ConfigMap in NS-1 appointing to a resource you can not use this ConfigMap in NS-2 which will need to have its own ConfigMap
+- Some resources can NOT be created within a Namespace. Ex. Volume and Node they are out of the Namespace
+
+
+## Namespace use cases
+
+1. Structure your components like separating DEV, Test, Staging, Production, Database, monitoring, Elastic Stack, Nginx-ingress ...
+
+2. Avoid conflicts between teams, imagine two teams decide create two different deployments with the same name my-app deployment. Once resource will destroy the other one.
+
+3. Share services between different environments. Ex. when we have staging and production namespace, we could also have Elastic Stack and Nginx-ingress namespaces. We could also use Production Blue and Production green, two levels of maturety for production
+
+4. Access and Resource Limition. We can give access to a team to access only on namespace. We can also limit cpu, ram storage per NS
+
+
+## Creating a namespace
+
+```
+degutos@pop-os:~/git/wikis.wiki$ kubectl create ns my-namespace
+namespace/my-namespace created
+
+degutos@pop-os:~/git/wikis.wiki$ kubectl get ns
+NAME              STATUS   AGE
+default           Active   22h
+kube-node-lease   Active   22h
+kube-public       Active   22h
+kube-system       Active   22h
+my-namespace      Active   5s
+```
+
+
+# Ingress 
+
+
+Ingress is another layer to expose our service outside. 
+External service expose our service through external IP and port over 30000, but to a end product this is not what we want. We want to have some domain name and https secure protocol. For that we can use Ingress 
+
+Ingress will receive customer request (from outside world) and send the request to the our `INTERNAL` service exposed for the pod. Eventually the external service will send the request to the pod internally
+
+```
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: name
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+spec:
+  rules:
+    - host: app.com
+      http:
+        paths:
+          - path: /
+            backend:
+              serviceName: my-service
+              servicePort: 8080
+
+```
+
+## Ingress Controller 
+
+- Ingress controller is a pod or group of pods to 
+- evaluate all the rules, 
+- manage redirections
+- Entrypoint to cluster
+- Many options of third-party implementaions 
+- k8s Nginx Ingress Controller - kube solution for ingress controller
+
+
+### LoadBalancer
+
+There are many different ways of configure our ingress. Most of Cloud provider will provide you an external LoadBalancer as an external entry point which will receive the external requests and forward to Ingress Controller to apply and evaluate all the rules
+If you are configuring your cluster manually with a baremetal, you will need to provide a solution of LoadBalancer on your own.
+
+
+### Installing ingress controller on Minikube
+
+```
+$ minikube addons enable ingress
+```
+
+```
+degutos@pop-os:~/git/wikis.wiki$ minikube addons enable ingress
+💡  ingress is an addon maintained by Kubernetes. For any concerns contact minikube on GitHub.
+You can view the list of minikube maintainers at: https://github.com/kubernetes/minikube/blob/master/OWNERS
+    ▪ Using image k8s.gcr.io/ingress-nginx/controller:v1.2.1
+    ▪ Using image k8s.gcr.io/ingress-nginx/kube-webhook-certgen:v1.1.1
+    ▪ Using image k8s.gcr.io/ingress-nginx/kube-webhook-certgen:v1.1.1
+🔎  Verifying ingress addon...
+🌟  The 'ingress' addon is enabled
+```
+
+Lets check that we have a new NS called ingress-nginx
+
+```
+degutos@pop-os:~/git/wikis.wiki$ kubectl get ns
+NAME              STATUS   AGE
+default           Active   28h
+ingress-nginx     Active   5m
+kube-node-lease   Active   28h
+kube-public       Active   28h
+kube-system       Active   28h
+```
+
+Lets check what pods we have within ingress-nginx ns 
+
+```
+degutos@pop-os:~/git/wikis.wiki$ kubectl get po -n ingress-nginx
+NAME                                        READY   STATUS      RESTARTS   AGE
+ingress-nginx-admission-create-6crg5        0/1     Completed   0          8m18s
+ingress-nginx-admission-patch-248n8         0/1     Completed   1          8m18s
+ingress-nginx-controller-755dfbfc65-mm8nw   1/1     Running     0          8m18s
+```
+
+Now we can see that we have installed the Ingress Controller on our Cluster
+
+
+
+
+### Creating a Dashboard-ingress
+
+```
+-> minikube addons enable dashboard        ~/git/kube-deployment-lab/demo-kube-yaml(main✗)@pop-os
+💡  dashboard is an addon maintained by Kubernetes. For any concerns contact minikube on GitHub.
+You can view the list of minikube maintainers at: https://github.com/kubernetes/minikube/blob/master/OWNERS
+    ▪ Using image kubernetesui/dashboard:v2.6.0
+    ▪ Using image kubernetesui/metrics-scraper:v1.0.8
+💡  Some dashboard features require the metrics-server addon. To enable all features please run:
+
+        minikube addons enable metrics-server
+
+
+🌟  The 'dashboard' addon is enabled
+-> 
+```
+
+Now lets check what we have inside of kubernetes-dashboard namespace
+
+```
+-> kubectl get all -n kubernetes-dashboard ~/git/kube-deployment-lab/demo-kube-yaml(main✗)@pop-os
+NAME                                             READY   STATUS    RESTARTS   AGE
+pod/dashboard-metrics-scraper-78dbd9dbf5-62v59   1/1     Running   0          30m
+pod/kubernetes-dashboard-5fd5574d9f-8d8cr        1/1     Running   0          30m
+
+NAME                                TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)    AGE
+service/dashboard-metrics-scraper   ClusterIP   10.102.252.81   <none>        8000/TCP   30m
+service/kubernetes-dashboard        ClusterIP   10.109.68.205   <none>        80/TCP     30m
+
+NAME                                        READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/dashboard-metrics-scraper   1/1     1            1           30m
+deployment.apps/kubernetes-dashboard        1/1     1            1           30m
+
+NAME                                                   DESIRED   CURRENT   READY   AGE
+replicaset.apps/dashboard-metrics-scraper-78dbd9dbf5   1         1         1       30m
+replicaset.apps/kubernetes-dashboard-5fd5574d9f        1         1         1       30m
+->    
+```
+
+Realize that we have `kubernetes-dashboard ` pod and internal service already created. Now we can create our Ingress rules in order to access Dashboard from outside by using our Host IP 
+
+```
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: dashboard-ingress
+  namespace: kubernetes-dashboard
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+spec:
+  rules:
+  - host: dashboard.com
+    http:
+      paths:
+      - path: /
+        pathType: Exact  
+        backend:
+          service:
+            name: kubernetes-dashboard
+            port: 
+              number: 80
+
+```
+
+
+Lets now apply our new yaml file created
+
+```
+-> kubectl apply -f dashboard-ingress.yaml ~/git/kube-deployment-lab/demo-kube-yaml(main✗)@pop-os
+ingress.networking.k8s.io/dashboard-ingress created
+```
+
+
+Now lets check our ingress dashboard resource created 
+
+```
+-> kubectl get ingress -n kubernetes-dashboard
+NAME                CLASS    HOSTS           ADDRESS        PORTS   AGE
+dashboard-ingress   <none>   dashboard.com   192.168.49.2   80      77s
+```
+
+Realize that the dashboard ingress reflects the same IP of the Node `192.168.49.2`
+
+```
+> kubectl get no -o wide                  ~/git/kube-deployment-lab/demo-kube-yaml(main✗)@pop-os
+NAME       STATUS   ROLES           AGE    VERSION   INTERNAL-IP    EXTERNAL-IP   OS-IMAGE             KERNEL-VERSION             CONTAINER-RUNTIME
+minikube   Ready    control-plane   3d1h   v1.24.3   192.168.49.2   <none>        Ubuntu 20.04.4 LTS   5.18.10-76051810-generic   docker://20.10.17
+```
+
+
